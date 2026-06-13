@@ -24,19 +24,23 @@ Most SDD tooling treats these as separate concerns — separate files, separate 
 
 ```
 your-repo/
-├── CLAUDE.md                      # + workflow rules and role gates
+├── CLAUDE.md                            # + workflow rules and role gates
 ├── docs/
-│   └── ONE-SPEC.md                # the convention itself
-├── skills/
-│   └── feature-spec.SKILLS.md     # teaches Claude to draft requirements.md from a one-liner
+│   └── ONE-SPEC.md                      # the convention itself
+├── .claude/skills/
+│   ├── one-spec-init/SKILL.md           # one-time bootstrap skill (/one-spec-init)
+│   └── feature-spec/SKILL.md            # drafts requirements.md from a one-liner (/feature-spec)
 └── features/
     └── _template/
-        ├── requirements.md        # SDD scope + BDD scenarios (Given/When/Then, tagged F<n>-S<n>)
-        ├── validation.md          # TDD test stubs, 1:1 with scenario IDs
-        └── plan.md                # architecture, mapped to scenario IDs
+        ├── requirements.md              # SDD scope + BDD scenarios (Given/When/Then, tagged F<n>-S<n>)
+        ├── validation.md                # TDD test stubs, 1:1 with scenario IDs
+        └── plan.md                      # architecture, mapped to scenario IDs
 ```
 
-Four files. No install. Copy them into your repo, add the CLAUDE.md additions, and Claude Code picks up the convention on its next session.
+No install. The skills live under `.claude/skills/` so Claude Code discovers
+them as real, invokable skills. Copy the files in (or just drop in
+`one-spec-init` and let it write the rest), add the CLAUDE.md additions, and
+the convention is live on the next session.
 
 ## The core idea
 
@@ -78,10 +82,12 @@ No external approval system — the approval *is* a comment in the file Claude i
 
 ## Quickstart
 
-1. Copy `skills/one-spec-init.SKILLS.md` into your project's `skills/` folder
-2. Ask Claude: "set up one-spec here" (or "run one-spec-init")
-3. Claude creates `docs/ONE-SPEC.md`, `skills/feature-spec.SKILLS.md`,
-   `features/_template/*`, and updates your `CLAUDE.md`
+1. Copy `.claude/skills/one-spec-init/SKILL.md` into your project at the same
+   path (`.claude/skills/one-spec-init/SKILL.md`)
+2. Ask Claude: "set up one-spec here" (or run `/one-spec-init`)
+3. Claude creates `docs/ONE-SPEC.md`, `.claude/skills/feature-spec/SKILL.md`,
+   `features/_template/*`, updates your `CLAUDE.md`, and offers to scaffold
+   starter `mission.md` / `tech-stack.md` / `roadmap.md`
 4. Give Claude a one-line feature idea — the `feature-spec` skill takes it from there
 
 ## License

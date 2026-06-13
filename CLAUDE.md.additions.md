@@ -30,7 +30,8 @@ test design.
 2. **STOP.** Check `requirements.md` for a product reviewer approval
    comment. If absent, do not proceed — tell the user it's awaiting review.
 3. Draft `validation.md` — one test stub per scenario ID from
-   `requirements.md`, 1:1. Flag any new dependencies/config needed.
+   `requirements.md`, 1:1, in this project's test framework and language.
+   Flag any new dependencies/config needed.
 4. **STOP.** Check `validation.md` for a tech lead approval comment. If
    absent, do not proceed — tell the user it's awaiting review.
 5. Draft `plan.md` — components mapped to the scenario IDs they satisfy,
