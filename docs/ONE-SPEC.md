@@ -39,6 +39,8 @@ Each feature lives in its own folder: `features/<NN>-<short-name>/`
 - Written *before* implementation — these should fail initially
 - Tech lead approval recorded as an inline HTML comment
 - Any new dependencies or config needed are flagged here, *before* `plan.md`
+- Use your project's own test framework and language — the worked example
+  below happens to use Python/pytest, but that is illustrative only
 
 ### `plan.md` — Architecture
 
