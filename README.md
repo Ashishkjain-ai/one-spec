@@ -86,4 +86,4 @@ No external approval system — the approval *is* a comment in the file Claude i
 
 ## License
 
-MIT — see [LICENSE](LICENSE)
+MIT — see [LICENSE](LICENSE.txt)
