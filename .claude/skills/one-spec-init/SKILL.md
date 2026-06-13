@@ -223,7 +223,7 @@ Because every scenario has an ID that appears in three files:
 - To find scope creep: any test in `validation.md` with no corresponding
   scenario ID is undocumented behavior
 
-This is the basis for an audit trail (e.g. SR 11-7 style traceability):
+This gives you a full traceable thread:
 mission → requirement → scenario → test → code → roadmap, all connected by
 plain-text IDs you can `grep`.
 
