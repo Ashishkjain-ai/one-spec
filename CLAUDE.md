@@ -56,7 +56,7 @@ Researched June 2026. Closest tools found:
 
 ## Active plan
 
-See `GAPS.md` for the full tracked plan with statuses. Priority order:
+See `ROADMAP.md` for the full tracked plan with statuses. Priority order:
 
 1. **G1** — `spec-trace` linter (enforcement) — *the unlock for all other claims*
 2. **G2** — Close the executable gap (validation.md IDs → real runnable tests)
