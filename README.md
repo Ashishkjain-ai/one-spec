@@ -76,6 +76,14 @@ No external approval system — the approval *is* a comment in the file Claude i
 - Not a CLI (v1) — pure markdown convention, zero dependencies
 - Not enforcement — that's what an optional future linter (`spec-trace`, v2) would check
 
+## Quickstart
+
+1. Copy `skills/one-spec-init.SKILLS.md` into your project's `skills/` folder
+2. Ask Claude: "set up one-spec here" (or "run one-spec-init")
+3. Claude creates `docs/ONE-SPEC.md`, `skills/feature-spec.SKILLS.md`,
+   `features/_template/*`, and updates your `CLAUDE.md`
+4. Give Claude a one-line feature idea — the `feature-spec` skill takes it from there
+
 ## License
 
 MIT (suggested — adjust as needed)
