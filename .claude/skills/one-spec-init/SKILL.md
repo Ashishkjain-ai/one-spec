@@ -1,3 +1,8 @@
+---
+name: one-spec-init
+description: Bootstrap the one-spec convention (SDD + BDD + TDD in one spec file) into the current repo. Use when the user says "set up one-spec here", "initialize one-spec", or "run one-spec-init". Creates docs/ONE-SPEC.md, the feature-spec skill, feature templates, and updates CLAUDE.md.
+---
+
 # Skill: one-spec-init
 
 ## Purpose
@@ -15,16 +20,15 @@ or "run one-spec-init".
 
 1. **Check current state** before writing anything:
    - Does `CLAUDE.md` exist at the repo root?
-   - Do `docs/`, `skills/`, `features/` already exist?
+   - Do `docs/`, `.claude/skills/`, `features/` already exist?
    - Do `mission.md`, `tech-stack.md`, `roadmap.md` exist at the repo root?
-     (one-spec does not create these — just note if missing)
 
 2. **Create the following files** using the embedded content below.
    Do not overwrite files that already exist with the same path — if a
    conflict exists, tell the user and ask before overwriting.
 
    - `docs/ONE-SPEC.md`
-   - `skills/feature-spec.SKILLS.md`
+   - `.claude/skills/feature-spec/SKILL.md`
    - `features/_template/requirements.md`
    - `features/_template/validation.md`
    - `features/_template/plan.md`
@@ -36,7 +40,15 @@ or "run one-spec-init".
      section to the end of the file, under a `## one-spec` heading, rather
      than overwriting existing content.
 
-4. **Report back to the user**:
+4. **Offer to scaffold the project context files** (`mission.md`,
+   `tech-stack.md`, `roadmap.md`). The one-spec workflow references these:
+   `feature-spec` cross-checks `roadmap.md`, and `CLAUDE.md` points to all
+   three. They are recommended but not required. If any are missing, offer
+   to create starter versions using the "project context starters" section
+   below — do not create them without asking, and never overwrite existing
+   ones.
+
+5. **Report back to the user**:
    - List every file created (and any skipped due to conflicts)
    - Note any of `mission.md` / `tech-stack.md` / `roadmap.md` that are
      missing, with a one-line explanation that they're recommended but not
@@ -96,6 +108,8 @@ Each feature lives in its own folder: `features/<NN>-<short-name>/`
 - Written *before* implementation — these should fail initially
 - Tech lead approval recorded as an inline HTML comment
 - Any new dependencies or config needed are flagged here, *before* `plan.md`
+- Use your project's own test framework and language — the worked example
+  below happens to use Python/pytest, but that is illustrative only
 
 ### `plan.md` — Architecture
 
@@ -220,12 +234,16 @@ plain-text IDs you can `grep`.
 `one-spec`'s ID convention can be layered onto specs from other tools
 (Spec Kit, OpenSpec, Kiro) by adding scenario IDs to their existing
 requirements/spec files — it does not require replacing their structure.
-
 ~~~
 
-### `skills/feature-spec.SKILLS.md`
+### `.claude/skills/feature-spec/SKILL.md`
 
 ~~~markdown
+---
+name: feature-spec
+description: Draft a one-spec requirements.md (SDD scope + BDD Given/When/Then scenarios, tagged F<n>-S<n>) for a new feature from a one-line idea. Use when the user gives a feature idea and the repo follows the one-spec convention. Stops after requirements.md — does not write validation.md or plan.md.
+---
+
 # Skill: feature-spec
 
 ## Purpose
@@ -240,12 +258,14 @@ A one-line feature description from the user, e.g.:
 
 ## Before drafting
 
-1. Check `roadmap.md` to determine the next feature number `<n>`.
-2. Check existing `features/*/requirements.md` files to confirm the next
-   scenario numbering starts at `S1` for this new feature (each feature's
-   scenarios are numbered independently, starting from 1).
+1. Determine the next feature number `<n>`: take the highest `NN` prefix
+   among existing `features/<NN>-*/` folders and add 1 (start at 1 if there
+   are none). If a `roadmap.md` exists, cross-check the number against it —
+   the `features/` directory is the source of truth, `roadmap.md` is a
+   secondary check.
+2. Each feature's scenarios are numbered independently, starting from `S1`.
 3. Create the folder `features/<NN>-<short-name>/` using a short kebab-case
-   name derived from the feature idea.
+   name derived from the feature idea (zero-pad the number, e.g. `01`, `02`).
 
 ## Output: `requirements.md`
 
@@ -296,7 +316,6 @@ Output a short message to the user:
 
 Do not proceed to validation.md until an approval comment is present in
 requirements.md (per CLAUDE.md workflow rules).
-
 ~~~
 
 ### `features/_template/requirements.md`
@@ -328,7 +347,6 @@ Then <expected outcome>
 -->
 
 <!-- Reviewer note (product reviewer): -->
-
 ~~~
 
 ### `features/_template/validation.md`
@@ -340,24 +358,21 @@ Then <expected outcome>
 One test stub per scenario ID from requirements.md, 1:1.
 Written before implementation — these should fail initially.
 Flag any new dependencies/config needed (before plan.md is drafted).
+
+Use your project's own test framework and language — the stubs below are
+language-neutral placeholders. Keep the scenario ID (F<n>-S<n>) in the test
+name or a comment so the spec stays grep-able.
 -->
 
 ## F<n>-S1 → test_<name>
-def test_<name>():
-    # arrange
-    # act
-    # assert
-    pass
+<!-- Given <initial state> / When <action> / Then <expected outcome> -->
+TODO: implement test for F<n>-S1 in the project's test framework
 
 ## F<n>-S2 → test_<name>
-def test_<name>():
-    # arrange
-    # act
-    # assert
-    pass
+<!-- Given <initial state> / When <action> / Then <expected outcome> -->
+TODO: implement test for F<n>-S2 in the project's test framework
 
 <!-- Tech lead note: -->
-
 ~~~
 
 ### `features/_template/plan.md`
@@ -376,7 +391,6 @@ def test_<name>():
 2. <step 2>
 3. Run validation.md suite, confirm all green
 4. Update roadmap.md: mark Feature <n> complete
-
 ~~~
 
 ### CLAUDE.md additions
@@ -414,7 +428,8 @@ test design.
 2. **STOP.** Check `requirements.md` for a product reviewer approval
    comment. If absent, do not proceed — tell the user it's awaiting review.
 3. Draft `validation.md` — one test stub per scenario ID from
-   `requirements.md`, 1:1. Flag any new dependencies/config needed.
+   `requirements.md`, 1:1, in this project's test framework and language.
+   Flag any new dependencies/config needed.
 4. **STOP.** Check `validation.md` for a tech lead approval comment. If
    absent, do not proceed — tell the user it's awaiting review.
 5. Draft `plan.md` — components mapped to the scenario IDs they satisfy,
@@ -448,7 +463,53 @@ Claude should look for these HTML comments specifically. If a human adds
 notes *without* the word "Approved", treat it as feedback requiring changes
 to `requirements.md`/`validation.md` before re-requesting approval — do not
 treat any comment as automatic sign-off.
+~~~
 
+---
+
+## Project context starters
+
+Only used in step 4, and only if the user agrees. These are optional —
+one-spec works without them, but the workflow references them. Never
+overwrite an existing file.
+
+### `mission.md`
+
+~~~markdown
+# Mission
+
+<!-- One or two paragraphs: what this project is for and who it serves. -->
+
+## Goals
+- <goal>
+
+## Non-goals
+- <explicitly out of scope>
+~~~
+
+### `tech-stack.md`
+
+~~~markdown
+# Tech Stack
+
+<!-- The languages, frameworks, and key dependencies this project uses. -->
+<!-- one-spec rule: do not add a new dependency without updating this file. -->
+
+- Language:
+- Test framework:
+- Key dependencies:
+~~~
+
+### `roadmap.md`
+
+~~~markdown
+# Roadmap
+
+<!-- One line per feature. feature-spec cross-checks the next number here. -->
+
+| #  | Feature | Status |
+|----|---------|--------|
+| 01 | <name>  | planned |
 ~~~
 
 ---
@@ -456,8 +517,8 @@ treat any comment as automatic sign-off.
 ## Notes
 
 - This skill is self-contained: a user only needs to copy this one file
-  into `skills/one-spec-init.SKILLS.md` in their repo, then ask Claude to
-  run it.
+  into `.claude/skills/one-spec-init/SKILL.md` in their repo, then ask
+  Claude to run it.
 - After running, the repo has everything needed for the one-spec workflow:
   the convention doc, the feature-spec skill, empty templates, and updated
   CLAUDE.md workflow rules.

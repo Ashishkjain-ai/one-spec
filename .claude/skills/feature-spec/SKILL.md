@@ -1,3 +1,8 @@
+---
+name: feature-spec
+description: Draft a one-spec requirements.md (SDD scope + BDD Given/When/Then scenarios, tagged F<n>-S<n>) for a new feature from a one-line idea. Use when the user gives a feature idea and the repo follows the one-spec convention. Stops after requirements.md — does not write validation.md or plan.md.
+---
+
 # Skill: feature-spec
 
 ## Purpose
@@ -12,12 +17,14 @@ A one-line feature description from the user, e.g.:
 
 ## Before drafting
 
-1. Check `roadmap.md` to determine the next feature number `<n>`.
-2. Check existing `features/*/requirements.md` files to confirm the next
-   scenario numbering starts at `S1` for this new feature (each feature's
-   scenarios are numbered independently, starting from 1).
+1. Determine the next feature number `<n>`: take the highest `NN` prefix
+   among existing `features/<NN>-*/` folders and add 1 (start at 1 if there
+   are none). If a `roadmap.md` exists, cross-check the number against it —
+   the `features/` directory is the source of truth, `roadmap.md` is a
+   secondary check.
+2. Each feature's scenarios are numbered independently, starting from `S1`.
 3. Create the folder `features/<NN>-<short-name>/` using a short kebab-case
-   name derived from the feature idea.
+   name derived from the feature idea (zero-pad the number, e.g. `01`, `02`).
 
 ## Output: `requirements.md`
 
