@@ -67,7 +67,7 @@ Two human gates, enforced by `CLAUDE.md`, recorded as inline comments in the fil
 1. **Product reviewer** approves `requirements.md` before `validation.md` is drafted
 2. **Tech lead** approves `validation.md` before implementation begins
 
-No external approval system — the approval *is* a comment in the file Claude is about to act on next. Git-diffable, audit-friendly, and the basis for any SR 11-7 / model governance traceability story.
+No external approval system — the approval *is* a comment in the file Claude is about to act on next. Git-diffable and version-controlled alongside the spec itself.
 
 ## How it works (workflow)
 
