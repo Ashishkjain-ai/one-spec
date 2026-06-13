@@ -31,10 +31,16 @@ your-repo/
 │   ├── one-spec-init/SKILL.md           # one-time bootstrap skill (/one-spec-init)
 │   └── feature-spec/SKILL.md            # drafts requirements.md from a one-liner (/feature-spec)
 └── features/
-    └── _template/
-        ├── requirements.md              # SDD scope + BDD scenarios (Given/When/Then, tagged F<n>-S<n>)
-        ├── validation.md                # TDD test stubs, 1:1 with scenario IDs
-        └── plan.md                      # architecture, mapped to scenario IDs
+    ├── _template/                       # blank templates to copy per feature
+    │   ├── requirements.md              # SDD scope + BDD scenarios (Given/When/Then, tagged F<n>-S<n>)
+    │   ├── validation.md                # TDD test stubs, 1:1 with scenario IDs
+    │   └── plan.md                      # architecture, mapped to scenario IDs
+    ├── 01-infection-spread/             # worked example: complete (both gates approved)
+    │   ├── requirements.md
+    │   ├── validation.md
+    │   └── plan.md
+    └── 02-supply-scavenging/            # worked example: mid-flow (awaiting product review)
+        └── requirements.md              # only file present — gate not yet passed
 ```
 
 No install. The skills live under `.claude/skills/` so Claude Code discovers
