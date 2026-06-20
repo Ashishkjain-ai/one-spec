@@ -32,6 +32,9 @@ or "run one-spec-init".
    - `features/_template/requirements.md`
    - `features/_template/validation.md`
    - `features/_template/plan.md`
+   - `spec-trace` (the linter — Python, zero deps)
+   - `.github/workflows/spec-trace.yml` (CI check)
+   - `.one-spec/hooks/pre-commit` (pre-commit hook)
 
 3. **Update `CLAUDE.md`**:
    - If `CLAUDE.md` does not exist, create it with the content from the
@@ -53,6 +56,14 @@ or "run one-spec-init".
    - Note any of `mission.md` / `tech-stack.md` / `roadmap.md` that are
      missing, with a one-line explanation that they're recommended but not
      required for one-spec itself
+   - Tell the user to wire up the pre-commit hook (one-time step):
+     ```bash
+     ln -s ../../.one-spec/hooks/pre-commit .git/hooks/pre-commit
+     ```
+   - Tell the user to verify the linter passes on the current state:
+     ```bash
+     python spec-trace check
+     ```
    - Offer: "Want me to draft the first feature spec? Give me a one-line
      idea and I'll use the feature-spec skill."
 
@@ -391,6 +402,234 @@ TODO: implement test for F<n>-S2 in the project's test framework
 2. <step 2>
 3. Run validation.md suite, confirm all green
 4. Update roadmap.md: mark Feature <n> complete
+~~~
+
+### `spec-trace`
+
+~~~python
+#!/usr/bin/env python3
+"""spec-trace: lint one-spec feature folders for convention compliance.
+
+Checks (all run on every invocation):
+  C4  Folder numbering — NN prefixes are unique and contiguous from 01
+  C5  Gate state      — validation.md/plan.md only exist after approval
+  C1  Coverage        — every F<n>-S<n> in requirements.md has a stub in validation.md
+  C2  Orphans         — every ID in validation.md/plan.md exists in some requirements.md
+
+Usage:
+  python spec-trace check
+  python spec-trace check --features-dir path/to/features
+"""
+
+import argparse
+import re
+import sys
+from pathlib import Path
+
+_ID_HEADER = re.compile(r'^###\s+(F\d+-S\d+)\s*$', re.MULTILINE)
+_ID_REF = re.compile(r'\bF\d+-S\d+\b')
+_HTML_COMMENT = re.compile(r'<!--(.*?)-->', re.DOTALL)
+
+
+def _read(path: Path) -> str:
+    return path.read_text(encoding='utf-8')
+
+
+def _defined_ids(requirements: Path) -> list:
+    return _ID_HEADER.findall(_read(requirements))
+
+
+def _referenced_ids(path: Path) -> set:
+    return set(_ID_REF.findall(_read(path)))
+
+
+def _approved(path: Path, role: str) -> bool:
+    role_lower = role.lower()
+    for m in _HTML_COMMENT.finditer(_read(path)):
+        body = m.group(1).lower()
+        if role_lower in body and 'approved' in body:
+            return True
+    return False
+
+
+def _feature_folders(features_dir: Path) -> list:
+    return sorted(
+        d for d in features_dir.iterdir()
+        if d.is_dir() and d.name != '_template'
+    )
+
+
+def _check_numbering(folders: list) -> list:
+    failures = []
+    prefixes = []
+    for folder in folders:
+        m = re.match(r'^(\d+)-', folder.name)
+        if not m:
+            failures.append(
+                f"FAIL {folder.name}: folder name must start with a zero-padded "
+                f"number followed by a dash (e.g. 01-my-feature)"
+            )
+            continue
+        prefixes.append(int(m.group(1)))
+    seen: set = set()
+    for n in prefixes:
+        if n in seen:
+            failures.append(f"FAIL features/: duplicate folder number {n:02d}")
+        seen.add(n)
+    for i, n in enumerate(sorted(prefixes), start=1):
+        if n != i:
+            failures.append(
+                f"FAIL features/: numbering gap — expected {i:02d}, found {n:02d}"
+            )
+            break
+    return failures
+
+
+def _check_gates(folders: list) -> list:
+    failures = []
+    for folder in folders:
+        req  = folder / 'requirements.md'
+        val  = folder / 'validation.md'
+        plan = folder / 'plan.md'
+        if val.exists():
+            if not req.exists():
+                failures.append(
+                    f"FAIL {folder.name}: validation.md exists but requirements.md is missing"
+                )
+            elif not _approved(req, 'reviewer note'):
+                failures.append(
+                    f"FAIL {folder.name}: gate 1 violated — validation.md exists but "
+                    f"requirements.md has no approval comment"
+                )
+        if plan.exists():
+            if not val.exists():
+                failures.append(
+                    f"FAIL {folder.name}: plan.md exists but validation.md is missing"
+                )
+            elif not _approved(val, 'tech lead note'):
+                failures.append(
+                    f"FAIL {folder.name}: gate 2 violated — plan.md exists but "
+                    f"validation.md has no approval comment"
+                )
+    return failures
+
+
+def _check_coverage(folders: list) -> list:
+    failures = []
+    for folder in folders:
+        req = folder / 'requirements.md'
+        val = folder / 'validation.md'
+        if not req.exists() or not val.exists():
+            continue
+        referenced = _referenced_ids(val)
+        for id_ in _defined_ids(req):
+            if id_ not in referenced:
+                failures.append(
+                    f"FAIL {folder.name}: {id_} defined in requirements.md "
+                    f"has no stub in validation.md"
+                )
+    return failures
+
+
+def _check_orphans(folders: list) -> list:
+    failures = []
+    known: set = set()
+    for folder in folders:
+        req = folder / 'requirements.md'
+        if req.exists():
+            known.update(_defined_ids(req))
+    for folder in folders:
+        for filename in ('validation.md', 'plan.md'):
+            path = folder / filename
+            if not path.exists():
+                continue
+            for id_ in _referenced_ids(path):
+                if id_ not in known:
+                    failures.append(
+                        f"FAIL {folder.name}/{filename}: {id_} not defined in any "
+                        f"requirements.md (orphan ID — possible scope creep)"
+                    )
+    return failures
+
+
+def cmd_check(features_dir: Path) -> int:
+    if not features_dir.exists():
+        print(f"ERROR: features directory not found: {features_dir}", file=sys.stderr)
+        return 1
+    folders = _feature_folders(features_dir)
+    failures = (
+        _check_numbering(folders)
+        + _check_gates(folders)
+        + _check_coverage(folders)
+        + _check_orphans(folders)
+    )
+    if failures:
+        for line in failures:
+            print(line)
+        print(f"\n{len(failures)} violation(s).")
+        return 1
+    scenario_count = sum(
+        len(_defined_ids(f / 'requirements.md'))
+        for f in folders
+        if (f / 'requirements.md').exists()
+    )
+    print(f"PASS {len(folders)} feature(s), {scenario_count} scenario(s) — all clear.")
+    return 0
+
+
+def main() -> None:
+    parser = argparse.ArgumentParser(
+        prog='spec-trace',
+        description='Lint one-spec feature folders for convention compliance.',
+    )
+    sub = parser.add_subparsers(dest='cmd')
+    p = sub.add_parser('check', help='Run all checks (exits 1 on any violation)')
+    p.add_argument(
+        '--features-dir',
+        default='features',
+        metavar='DIR',
+        help='Path to features directory (default: ./features)',
+    )
+    args = parser.parse_args()
+    if args.cmd == 'check':
+        sys.exit(cmd_check(Path(args.features_dir)))
+    else:
+        parser.print_help()
+        sys.exit(1)
+
+
+if __name__ == '__main__':
+    main()
+~~~
+
+### `.github/workflows/spec-trace.yml`
+
+~~~yaml
+name: spec-trace
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Run spec-trace
+        run: python spec-trace check
+~~~
+
+### `.one-spec/hooks/pre-commit`
+
+~~~sh
+#!/bin/sh
+# spec-trace pre-commit hook — blocks commits that violate the one-spec convention.
+# Wire it up once:
+#   ln -s ../../.one-spec/hooks/pre-commit .git/hooks/pre-commit
+python spec-trace check
 ~~~
 
 ### CLAUDE.md additions

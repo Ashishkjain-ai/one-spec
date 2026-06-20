@@ -49,6 +49,25 @@ test design.
 
 ---
 
+## Enforcement
+
+`spec-trace` is the linter for this convention. Run it to verify gate compliance,
+coverage, and orphan IDs:
+
+```bash
+python spec-trace check
+```
+
+It exits 0 on all clear, 1 on any violation. The pre-commit hook
+(`.one-spec/hooks/pre-commit`) and GitHub Action
+(`.github/workflows/spec-trace.yml`) run it automatically. Wire up the hook once:
+
+```bash
+ln -s ../../.one-spec/hooks/pre-commit .git/hooks/pre-commit
+```
+
+---
+
 ## Notes on the gate checks
 
 The approval comments look like this and live inline in the file:

@@ -25,11 +25,16 @@ Most SDD tooling treats these as separate concerns — separate files, separate 
 ```
 your-repo/
 ├── CLAUDE.md                            # + workflow rules and role gates
+├── spec-trace                           # linter — run: python spec-trace check
 ├── docs/
 │   └── ONE-SPEC.md                      # the convention itself
 ├── .claude/skills/
 │   ├── one-spec-init/SKILL.md           # one-time bootstrap skill (/one-spec-init)
 │   └── feature-spec/SKILL.md            # drafts requirements.md from a one-liner (/feature-spec)
+├── .github/workflows/
+│   └── spec-trace.yml                   # CI: runs linter on every push and PR
+├── .one-spec/hooks/
+│   └── pre-commit                       # pre-commit hook (symlink once to .git/hooks/)
 └── features/
     ├── _template/                       # blank templates to copy per feature
     │   ├── requirements.md              # SDD scope + BDD scenarios (Given/When/Then, tagged F<n>-S<n>)
@@ -69,6 +74,27 @@ Two human gates, enforced by `CLAUDE.md`, recorded as inline comments in the fil
 
 No external approval system — the approval *is* a comment in the file Claude is about to act on next. Git-diffable and version-controlled alongside the spec itself.
 
+## Enforcement (spec-trace)
+
+`spec-trace` is a single-file Python linter (zero runtime dependencies) that gives the convention teeth. It runs four checks:
+
+| Check | What it catches |
+|---|---|
+| **C4** Numbering | Feature folder NN prefixes not unique or contiguous |
+| **C5** Gate state | `validation.md` or `plan.md` exists without the required approval comment |
+| **C1** Coverage | Scenario ID in `requirements.md` with no matching stub in `validation.md` |
+| **C2** Orphans | ID in `validation.md` or `plan.md` not defined in any `requirements.md` |
+
+```bash
+python spec-trace check          # exits 0 on all clear, 1 on any violation
+```
+
+Ships with a GitHub Action (`.github/workflows/spec-trace.yml`) and a pre-commit hook (`.one-spec/hooks/pre-commit`). Wire up the hook once:
+
+```bash
+ln -s ../../.one-spec/hooks/pre-commit .git/hooks/pre-commit
+```
+
 ## How it works (workflow)
 
 1. Give Claude a one-line feature idea
@@ -84,17 +110,33 @@ No external approval system — the approval *is* a comment in the file Claude i
 
 - Not a replacement for Spec Kit, OpenSpec, or Kiro — `one-spec`'s ID convention can be layered *into* an existing Spec Kit `specs/` folder
 - Not a CLI (v1) — pure markdown convention, zero dependencies
-- Not enforcement — that's what an optional future linter (`spec-trace`, v2) would check
+- Not required to use `spec-trace` — the convention works without it; the linter is the optional enforcement layer that turns "by convention" into "by tooling"
 
 ## Quickstart
 
 1. Copy `.claude/skills/one-spec-init/SKILL.md` into your project at the same
    path (`.claude/skills/one-spec-init/SKILL.md`)
 2. Ask Claude: "set up one-spec here" (or run `/one-spec-init`)
-3. Claude creates `docs/ONE-SPEC.md`, `.claude/skills/feature-spec/SKILL.md`,
-   `features/_template/*`, updates your `CLAUDE.md`, and offers to scaffold
-   starter `mission.md` / `tech-stack.md` / `roadmap.md`
-4. Give Claude a one-line feature idea — the `feature-spec` skill takes it from there
+3. Claude creates:
+   - `docs/ONE-SPEC.md` — the convention reference
+   - `.claude/skills/feature-spec/SKILL.md` — the drafting skill
+   - `features/_template/*` — blank templates
+   - `spec-trace` — the linter (copy this file, it has no dependencies)
+   - `.github/workflows/spec-trace.yml` — CI enforcement
+   - `.one-spec/hooks/pre-commit` — pre-commit hook
+   - Updates your `CLAUDE.md` with the workflow rules
+4. Wire up the pre-commit hook (one-time):
+   ```bash
+   ln -s ../../.one-spec/hooks/pre-commit .git/hooks/pre-commit
+   ```
+5. Verify everything is clean:
+   ```bash
+   python spec-trace check
+   ```
+6. Give Claude a one-line feature idea — the `feature-spec` skill takes it from there
+
+> **Without `one-spec-init`:** copy `spec-trace` directly from this repo into
+> your project root and run `python spec-trace check`. That's all it needs.
 
 ## License
 

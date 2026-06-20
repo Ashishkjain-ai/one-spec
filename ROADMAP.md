@@ -8,7 +8,7 @@ Priority order: G1 → G2 → G3 → G7 → G5 → G4 → G6
 
 ## Needle-movers
 
-### [ ] G1. `spec-trace` linter — give the convention teeth
+### [~] G1. `spec-trace` linter — give the convention teeth
 
 **Problem.** Every value claim (traceability, gates, "living spec") rests on
 an LLM voluntarily following `CLAUDE.md` prose. Nothing *fails* when the
