@@ -33,14 +33,17 @@ Each feature lives in its own folder: `features/<NN>-<short-name>/`
 - No implementation detail — behavior only
 - Reviewer approval recorded as an inline HTML comment
 
-### `validation.md` — TDD
+### `validation.md` — Acceptance criteria (TDD anchor)
 
-- One test stub per scenario ID, named or commented with that ID
-- Written *before* implementation — these should fail initially
+- One test stub per scenario ID — the tech lead's sign-off on *what the tests must verify*
+- Written *before* implementation; this is the spec, not the runnable test suite
 - Tech lead approval recorded as an inline HTML comment
 - Any new dependencies or config needed are flagged here, *before* `plan.md`
-- Use your project's own test framework and language — the worked example
-  below happens to use Python/pytest, but that is illustrative only
+- Use your project's own test framework and language for stubs
+
+**Test naming contract:** each stub maps to a real test function whose name contains
+the scenario ID in underscore form: `test_F1_S1_<description>()`. The `spec-trace`
+C3 check (with `--repo-root .`) verifies this link exists in the codebase.
 
 ### `plan.md` — Architecture
 
@@ -145,18 +148,20 @@ directly in the artifact the agent reads next — no external system needed.
 
 ## 5. Traceability
 
-Because every scenario has an ID that appears in three files:
+Because every scenario has an ID that appears in spec files and real test code:
 
 - To find what a requirement became as code: grep `F1-S1` across
-  `validation.md` and `plan.md`
+  `validation.md`, `plan.md`, and test files
 - To find what's untested: any scenario ID in `requirements.md` with no
   matching entry in `validation.md` is a gap
 - To find scope creep: any test in `validation.md` with no corresponding
   scenario ID is undocumented behavior
+- To verify real tests exist: `python spec-trace check --repo-root .` runs C3,
+  catching any scenario whose ID never appeared in a test function name
 
 This gives you a full traceable thread:
-mission → requirement → scenario → test → code → roadmap, all connected by
-plain-text IDs you can `grep`.
+mission → requirement → scenario → validation stub → real test → code → roadmap,
+all connected by plain-text IDs you can `grep`.
 
 ---
 

@@ -2,4 +2,4 @@
 # spec-trace pre-commit hook — blocks commits that violate the one-spec convention.
 # Wire it up once:
 #   ln -s ../../.one-spec/hooks/pre-commit .git/hooks/pre-commit
-python spec-trace check
+python spec-trace check --repo-root .

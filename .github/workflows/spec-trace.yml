@@ -12,6 +12,6 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - name: Run spec-trace
-        run: python spec-trace check
+        run: python spec-trace check --repo-root .
       - name: Run spec-trace tests
         run: python -m unittest discover -s tests -v

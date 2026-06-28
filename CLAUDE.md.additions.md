@@ -36,9 +36,10 @@ test design.
    absent, do not proceed — tell the user it's awaiting review.
 5. Draft `plan.md` — components mapped to the scenario IDs they satisfy,
    plus implementation order.
-6. Implement against `validation.md`: red → green → refactor, one scenario
-   ID at a time.
+6. Implement: write real tests named `test_F<n>_S<n>_<description>()`, make them
+   green against the implementation.
 7. When all scenarios for the feature are green:
+   - Run `python spec-trace check --repo-root .` to confirm full coverage (C3)
    - Update `roadmap.md` (mark feature complete)
    - Append a short summary to this file's context log (below), so future
      sessions know this feature exists and is done

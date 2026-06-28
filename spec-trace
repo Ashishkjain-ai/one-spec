@@ -6,10 +6,13 @@ Checks (all run on every invocation):
   C5  Gate state      — validation.md/plan.md only exist after approval
   C1  Coverage        — every F<n>-S<n> in requirements.md has a stub in validation.md
   C2  Orphans         — every ID in validation.md/plan.md exists in some requirements.md
+  C3  Realization     — every scenario with plan.md has a test_F<n>_S<n>_* function
+                        (only runs when --repo-root is provided)
 
 Usage:
   python spec-trace check
   python spec-trace check --features-dir path/to/features
+  python spec-trace check --repo-root .        # also runs C3
 """
 
 import argparse
@@ -23,6 +26,8 @@ _ID_HEADER = re.compile(r'^###\s+(F\d+-S\d+)\s*$', re.MULTILINE)
 _ID_REF = re.compile(r'\bF\d+-S\d+\b')
 # Individual HTML comments (matched one at a time to avoid cross-comment false positives)
 _HTML_COMMENT = re.compile(r'<!--(.*?)-->', re.DOTALL)
+# test_F1_S1_* function definition in a Python test file
+_TEST_FN = re.compile(r'def\s+test_[A-Za-z0-9_]*F(\d+)_S(\d+)', re.MULTILINE)
 
 
 def _read(path: Path) -> str:
@@ -178,10 +183,47 @@ def _check_orphans(folders: list) -> list:
 
 
 # ---------------------------------------------------------------------------
+# C3: realization (scenario IDs → real test function names)
+# ---------------------------------------------------------------------------
+
+def _realized_ids(repo_root: Path) -> set:
+    """IDs that appear in a test function name (test_F<n>_S<n>_*) under repo_root."""
+    realized = set()
+    seen: set = set()
+    for pattern in ('test_*.py', '*_test.py'):
+        for tf in repo_root.rglob(pattern):
+            if tf in seen:
+                continue
+            seen.add(tf)
+            for m in _TEST_FN.finditer(_read(tf)):
+                realized.add(f'F{m.group(1)}-S{m.group(2)}')
+    return realized
+
+
+def _check_realization(folders: list, repo_root: Path) -> list:
+    """C3: every scenario with plan.md must appear in a real test function name."""
+    realized = _realized_ids(repo_root)
+    failures = []
+    for folder in folders:
+        req  = folder / 'requirements.md'
+        plan = folder / 'plan.md'
+        if not req.exists() or not plan.exists():
+            continue
+        for id_ in _defined_ids(req):
+            if id_ not in realized:
+                norm = id_.replace('-', '_')
+                failures.append(
+                    f"FAIL {folder.name}: {id_} has no real test function "
+                    f"(add a function named test_{norm}_* to a test file)"
+                )
+    return failures
+
+
+# ---------------------------------------------------------------------------
 # Entry point
 # ---------------------------------------------------------------------------
 
-def cmd_check(features_dir: Path) -> int:
+def cmd_check(features_dir: Path, repo_root: Path = None) -> int:
     if not features_dir.exists():
         print(f"ERROR: features directory not found: {features_dir}", file=sys.stderr)
         return 1
@@ -192,6 +234,7 @@ def cmd_check(features_dir: Path) -> int:
         + _check_gates(folders)
         + _check_coverage(folders)
         + _check_orphans(folders)
+        + (_check_realization(folders, repo_root) if repo_root is not None else [])
     )
 
     if failures:
@@ -222,10 +265,20 @@ def main() -> None:
         metavar='DIR',
         help='Path to features directory (default: ./features)',
     )
+    p.add_argument(
+        '--repo-root',
+        default=None,
+        metavar='DIR',
+        help='Repo root for C3 realization check — searches test_*.py files for '
+             'scenario IDs in function names. If omitted, C3 is skipped.',
+    )
     args = parser.parse_args()
 
     if args.cmd == 'check':
-        sys.exit(cmd_check(Path(args.features_dir)))
+        sys.exit(cmd_check(
+            Path(args.features_dir),
+            repo_root=Path(args.repo_root) if args.repo_root else None,
+        ))
     else:
         parser.print_help()
         sys.exit(1)

@@ -31,7 +31,7 @@ ships a GitHub Action and a pre-commit hook.
 
 ---
 
-### [ ] G2. Close the executable gap — validation.md IDs → real tests
+### [x] G2. Close the executable gap — validation.md IDs → real tests
 
 **Problem.** `validation.md` is pseudocode. The real red→green loop happens
 in test files the convention doesn't track. "Failing test = spec diverged"

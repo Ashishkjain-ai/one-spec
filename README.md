@@ -84,9 +84,11 @@ No external approval system — the approval *is* a comment in the file Claude i
 | **C5** Gate state | `validation.md` or `plan.md` exists without the required approval comment |
 | **C1** Coverage | Scenario ID in `requirements.md` with no matching stub in `validation.md` |
 | **C2** Orphans | ID in `validation.md` or `plan.md` not defined in any `requirements.md` |
+| **C3** Realization | Scenario with `plan.md` but no `test_F<n>_S<n>_*` function in any test file (requires `--repo-root`) |
 
 ```bash
-python spec-trace check          # exits 0 on all clear, 1 on any violation
+python spec-trace check              # C4 + C5 + C1 + C2 — exits 0 on all clear
+python spec-trace check --repo-root .  # also runs C3 (full check including real tests)
 ```
 
 Ships with a GitHub Action (`.github/workflows/spec-trace.yml`) and a pre-commit hook (`.one-spec/hooks/pre-commit`). Wire up the hook once:
@@ -103,8 +105,8 @@ ln -s ../../.one-spec/hooks/pre-commit .git/hooks/pre-commit
 4. Claude drafts `validation.md` — TDD test stubs, 1:1 with each scenario ID
 5. **STOP** — tech lead approves (inline comment in `validation.md`)
 6. Claude drafts `plan.md` — architecture, each component mapped to scenario IDs
-7. Implementation proceeds: red → green → refactor against `validation.md`
-8. On all-green: update `roadmap.md`, append summary to `CLAUDE.md` context log
+7. Implementation proceeds: write real tests named `test_F<n>_S<n>_<description>()`, then make them green
+8. On all-green: `python spec-trace check --repo-root .` confirms full coverage; update `roadmap.md`
 
 ## What it isn't
 

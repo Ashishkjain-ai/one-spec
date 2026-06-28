@@ -17,13 +17,12 @@ SCRIPT = REPO_ROOT / 'spec-trace'
 FEATURES_DIR = REPO_ROOT / 'features'
 
 
-def run_check(features_dir: Path):
+def run_check(features_dir: Path, repo_root: Path = None):
     """Run 'spec-trace check' against a directory. Returns (exit_code, stdout)."""
-    result = subprocess.run(
-        [sys.executable, str(SCRIPT), 'check', '--features-dir', str(features_dir)],
-        capture_output=True,
-        text=True,
-    )
+    cmd = [sys.executable, str(SCRIPT), 'check', '--features-dir', str(features_dir)]
+    if repo_root is not None:
+        cmd += ['--repo-root', str(repo_root)]
+    result = subprocess.run(cmd, capture_output=True, text=True)
     return result.returncode, result.stdout
 
 
@@ -253,6 +252,76 @@ class TestEdgeCases(unittest.TestCase):
 
 
 # ---------------------------------------------------------------------------
+# C3: realization (scenario IDs → real test function names)
+# ---------------------------------------------------------------------------
+
+class TestRealization(unittest.TestCase):
+
+    def test_id_in_test_function_name_passes(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            d = Path(tmp)
+            features = d / 'features'; features.mkdir()
+            f = features / '01-feat'; f.mkdir()
+            write_requirements(f, approved=True)
+            write_validation(f, approved=True)
+            write_plan(f)
+            t = d / 'tests'; t.mkdir()
+            (t / 'test_feature.py').write_text('def test_F1_S1_something():\n    pass\n')
+            code, out = run_check(features, repo_root=d)
+            self.assertEqual(code, 0, msg=out)
+
+    def test_missing_test_function_fails(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            d = Path(tmp)
+            f = d / '01-feat'; f.mkdir()
+            write_requirements(f, approved=True)
+            write_validation(f, approved=True)
+            write_plan(f)
+            # No test file — C3 must catch the gap
+            code, out = run_check(d, repo_root=d)
+            self.assertEqual(code, 1)
+            self.assertIn('F1-S1', out)
+            self.assertIn('no real test', out)
+
+    def test_no_plan_skips_realization_check(self):
+        """C3 is skipped when plan.md doesn't exist — implementation hasn't started."""
+        with tempfile.TemporaryDirectory() as tmp:
+            d = Path(tmp)
+            f = d / '01-feat'; f.mkdir()
+            write_requirements(f, approved=True)
+            write_validation(f, approved=True)
+            code, out = run_check(d, repo_root=d)
+            self.assertEqual(code, 0, msg=out)
+
+    def test_no_repo_root_skips_realization_check(self):
+        """Without --repo-root, C3 is not run at all."""
+        with tempfile.TemporaryDirectory() as tmp:
+            d = Path(tmp)
+            f = d / '01-feat'; f.mkdir()
+            write_requirements(f, approved=True)
+            write_validation(f, approved=True)
+            write_plan(f)
+            code, out = run_check(d)  # no repo_root
+            self.assertEqual(code, 0, msg=out)
+
+    def test_id_in_file_but_not_in_function_name_fails(self):
+        """The ID must appear in a test function name — a string elsewhere doesn't count."""
+        with tempfile.TemporaryDirectory() as tmp:
+            d = Path(tmp)
+            f = d / '01-feat'; f.mkdir()
+            write_requirements(f, approved=True)
+            write_validation(f, approved=True)
+            write_plan(f)
+            t = d / 'tests'; t.mkdir()
+            (t / 'test_feature.py').write_text(
+                'SCENARIO = "F1-S1"\ndef test_something():\n    pass\n'
+            )
+            code, out = run_check(d, repo_root=d)
+            self.assertEqual(code, 1)
+            self.assertIn('F1-S1', out)
+
+
+# ---------------------------------------------------------------------------
 # Integration: the actual worked examples in this repo
 # ---------------------------------------------------------------------------
 
@@ -264,8 +333,8 @@ class TestWorkedExamples(unittest.TestCase):
     """
 
     def test_repo_features_pass(self):
-        """The full features/ directory always satisfies spec-trace."""
-        code, out = run_check(FEATURES_DIR)
+        """The full features/ directory always satisfies spec-trace, including C3."""
+        code, out = run_check(FEATURES_DIR, repo_root=REPO_ROOT)
         self.assertEqual(code, 0, msg=out)
 
     def test_feature_and_scenario_count(self):

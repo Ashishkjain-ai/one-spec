@@ -113,14 +113,17 @@ Each feature lives in its own folder: `features/<NN>-<short-name>/`
 - No implementation detail — behavior only
 - Reviewer approval recorded as an inline HTML comment
 
-### `validation.md` — TDD
+### `validation.md` — Acceptance criteria (TDD anchor)
 
-- One test stub per scenario ID, named or commented with that ID
-- Written *before* implementation — these should fail initially
+- One test stub per scenario ID — the tech lead's sign-off on *what the tests must verify*
+- Written *before* implementation; this is the spec, not the runnable test suite
 - Tech lead approval recorded as an inline HTML comment
 - Any new dependencies or config needed are flagged here, *before* `plan.md`
-- Use your project's own test framework and language — the worked example
-  below happens to use Python/pytest, but that is illustrative only
+- Use your project's own test framework and language for stubs
+
+**Test naming contract:** each stub maps to a real test function whose name contains
+the scenario ID in underscore form: `test_F1_S1_<description>()`. The `spec-trace`
+C3 check (with `--repo-root .`) verifies this link exists in the codebase.
 
 ### `plan.md` — Architecture
 
@@ -225,18 +228,20 @@ directly in the artifact the agent reads next — no external system needed.
 
 ## 5. Traceability
 
-Because every scenario has an ID that appears in three files:
+Because every scenario has an ID that appears in spec files and real test code:
 
 - To find what a requirement became as code: grep `F1-S1` across
-  `validation.md` and `plan.md`
+  `validation.md`, `plan.md`, and test files
 - To find what's untested: any scenario ID in `requirements.md` with no
   matching entry in `validation.md` is a gap
 - To find scope creep: any test in `validation.md` with no corresponding
   scenario ID is undocumented behavior
+- To verify real tests exist: `python spec-trace check --repo-root .` runs C3,
+  catching any scenario whose ID never appeared in a test function name
 
 This gives you a full traceable thread:
-mission → requirement → scenario → test → code → roadmap, all connected by
-plain-text IDs you can `grep`.
+mission → requirement → scenario → validation stub → real test → code → roadmap,
+all connected by plain-text IDs you can `grep`.
 
 ---
 
@@ -367,19 +372,22 @@ Then <expected outcome>
 
 <!--
 One test stub per scenario ID from requirements.md, 1:1.
-Written before implementation — these should fail initially.
-Flag any new dependencies/config needed (before plan.md is drafted).
+This is the tech lead's sign-off on *what the tests must verify* — not the
+runnable test file itself. Flag any new dependencies/config needed here,
+before plan.md is drafted.
 
-Use your project's own test framework and language — the stubs below are
-language-neutral placeholders. Keep the scenario ID (F<n>-S<n>) in the test
-name or a comment so the spec stays grep-able.
+Use your project's own test framework and language for stubs.
+
+Test naming contract: each stub corresponds to a real test function whose name
+contains the scenario ID in underscore form, e.g. test_F<n>_S<n>_<description>().
+spec-trace C3 (run with --repo-root .) verifies this link exists.
 -->
 
-## F<n>-S1 → test_<name>
+## F<n>-S1 → test_F<n>_S1_<description>
 <!-- Given <initial state> / When <action> / Then <expected outcome> -->
 TODO: implement test for F<n>-S1 in the project's test framework
 
-## F<n>-S2 → test_<name>
+## F<n>-S2 → test_F<n>_S2_<description>
 <!-- Given <initial state> / When <action> / Then <expected outcome> -->
 TODO: implement test for F<n>-S2 in the project's test framework
 
@@ -415,10 +423,13 @@ Checks (all run on every invocation):
   C5  Gate state      — validation.md/plan.md only exist after approval
   C1  Coverage        — every F<n>-S<n> in requirements.md has a stub in validation.md
   C2  Orphans         — every ID in validation.md/plan.md exists in some requirements.md
+  C3  Realization     — every scenario with plan.md has a test_F<n>_S<n>_* function
+                        (only runs when --repo-root is provided)
 
 Usage:
   python spec-trace check
   python spec-trace check --features-dir path/to/features
+  python spec-trace check --repo-root .        # also runs C3
 """
 
 import argparse
@@ -426,9 +437,14 @@ import re
 import sys
 from pathlib import Path
 
+# ### F1-S1 header (defines a scenario in requirements.md)
 _ID_HEADER = re.compile(r'^###\s+(F\d+-S\d+)\s*$', re.MULTILINE)
+# Any F1-S1 reference anywhere in a file
 _ID_REF = re.compile(r'\bF\d+-S\d+\b')
+# Individual HTML comments (matched one at a time to avoid cross-comment false positives)
 _HTML_COMMENT = re.compile(r'<!--(.*?)-->', re.DOTALL)
+# test_F1_S1_* function definition in a Python test file
+_TEST_FN = re.compile(r'def\s+test_[A-Za-z0-9_]*F(\d+)_S(\d+)', re.MULTILINE)
 
 
 def _read(path: Path) -> str:
@@ -552,7 +568,40 @@ def _check_orphans(folders: list) -> list:
     return failures
 
 
-def cmd_check(features_dir: Path) -> int:
+def _realized_ids(repo_root: Path) -> set:
+    """IDs that appear in a test function name (test_F<n>_S<n>_*) under repo_root."""
+    realized = set()
+    seen: set = set()
+    for pattern in ('test_*.py', '*_test.py'):
+        for tf in repo_root.rglob(pattern):
+            if tf in seen:
+                continue
+            seen.add(tf)
+            for m in _TEST_FN.finditer(_read(tf)):
+                realized.add(f'F{m.group(1)}-S{m.group(2)}')
+    return realized
+
+
+def _check_realization(folders: list, repo_root: Path) -> list:
+    """C3: every scenario with plan.md must appear in a real test function name."""
+    realized = _realized_ids(repo_root)
+    failures = []
+    for folder in folders:
+        req  = folder / 'requirements.md'
+        plan = folder / 'plan.md'
+        if not req.exists() or not plan.exists():
+            continue
+        for id_ in _defined_ids(req):
+            if id_ not in realized:
+                norm = id_.replace('-', '_')
+                failures.append(
+                    f"FAIL {folder.name}: {id_} has no real test function "
+                    f"(add a function named test_{norm}_* to a test file)"
+                )
+    return failures
+
+
+def cmd_check(features_dir: Path, repo_root: Path = None) -> int:
     if not features_dir.exists():
         print(f"ERROR: features directory not found: {features_dir}", file=sys.stderr)
         return 1
@@ -562,6 +611,7 @@ def cmd_check(features_dir: Path) -> int:
         + _check_gates(folders)
         + _check_coverage(folders)
         + _check_orphans(folders)
+        + (_check_realization(folders, repo_root) if repo_root is not None else [])
     )
     if failures:
         for line in failures:
@@ -590,9 +640,19 @@ def main() -> None:
         metavar='DIR',
         help='Path to features directory (default: ./features)',
     )
+    p.add_argument(
+        '--repo-root',
+        default=None,
+        metavar='DIR',
+        help='Repo root for C3 realization check — searches test_*.py files for '
+             'scenario IDs in function names. If omitted, C3 is skipped.',
+    )
     args = parser.parse_args()
     if args.cmd == 'check':
-        sys.exit(cmd_check(Path(args.features_dir)))
+        sys.exit(cmd_check(
+            Path(args.features_dir),
+            repo_root=Path(args.repo_root) if args.repo_root else None,
+        ))
     else:
         parser.print_help()
         sys.exit(1)
@@ -619,7 +679,9 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - name: Run spec-trace
-        run: python spec-trace check
+        run: python spec-trace check --repo-root .
+      - name: Run spec-trace tests
+        run: python -m unittest discover -s tests -v
 ~~~
 
 ### `.one-spec/hooks/pre-commit`
@@ -629,7 +691,7 @@ jobs:
 # spec-trace pre-commit hook — blocks commits that violate the one-spec convention.
 # Wire it up once:
 #   ln -s ../../.one-spec/hooks/pre-commit .git/hooks/pre-commit
-python spec-trace check
+python spec-trace check --repo-root .
 ~~~
 
 ### CLAUDE.md additions
@@ -673,9 +735,10 @@ test design.
    absent, do not proceed — tell the user it's awaiting review.
 5. Draft `plan.md` — components mapped to the scenario IDs they satisfy,
    plus implementation order.
-6. Implement against `validation.md`: red → green → refactor, one scenario
-   ID at a time.
+6. Implement: write real tests named `test_F<n>_S<n>_<description>()`, make them
+   green against the implementation.
 7. When all scenarios for the feature are green:
+   - Run `python spec-trace check --repo-root .` to confirm full coverage (C3)
    - Update `roadmap.md` (mark feature complete)
    - Append a short summary to this file's context log (below), so future
      sessions know this feature exists and is done
