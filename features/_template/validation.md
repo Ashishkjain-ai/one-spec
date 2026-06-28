@@ -21,4 +21,4 @@ TODO: implement test for F<n>-S1 in the project's test framework
 <!-- Given <initial state> / When <action> / Then <expected outcome> -->
 TODO: implement test for F<n>-S2 in the project's test framework
 
-<!-- Tech lead note: -->
+<!-- Tech lead note: Approved YYYY-MM-DD. Approved-by: @your-handle -->

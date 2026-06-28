@@ -74,14 +74,17 @@ ln -s ../../.one-spec/hooks/pre-commit .git/hooks/pre-commit
 The approval comments look like this and live inline in the file:
 
 ```markdown
-<!-- Reviewer note (product reviewer): Approved 2026-05-12. -->
+<!-- Reviewer note (product reviewer): Approved 2026-05-12. Approved-by: @alice -->
 ```
 
 ```markdown
-<!-- Tech lead note: Approved 2026-05-13. Fixed RNG seed needed for F1-S1. -->
+<!-- Tech lead note: Approved 2026-05-13. Approved-by: @bob -->
 ```
 
-Claude should look for these HTML comments specifically. If a human adds
-notes *without* the word "Approved", treat it as feedback requiring changes
-to `requirements.md`/`validation.md` before re-requesting approval — do not
-treat any comment as automatic sign-off.
+The `Approved-by: @name` field is **required** — `spec-trace` rejects approval
+comments that are missing it. Claude should check for both "Approved" and
+"Approved-by: @name" before treating a gate as passed.
+
+If a human adds notes *without* the word "Approved", treat it as feedback
+requiring changes before re-requesting approval — do not treat any comment as
+automatic sign-off.

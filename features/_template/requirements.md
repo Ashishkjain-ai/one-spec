@@ -23,4 +23,4 @@ Then <expected outcome>
 - Scenario IDs are sequential, never reused.
 -->
 
-<!-- Reviewer note (product reviewer): -->
+<!-- Reviewer note (product reviewer): Approved YYYY-MM-DD. Approved-by: @your-handle -->

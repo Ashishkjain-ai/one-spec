@@ -1,0 +1,14 @@
+# one-spec CODEOWNERS — enforces role-based approval at the PR level.
+#
+# GitHub blocks merging any PR that touches these files unless the named
+# owner has approved it. This is the identity layer that backs the
+# Approved-by: @name field in the approval comment.
+#
+# Replace the placeholders with real GitHub handles, then enable
+# "Require review from Code Owners" in your branch protection rules.
+
+# Gate 1: product reviewer must approve PRs that add/modify requirements.md
+features/*/requirements.md   @REPLACE-WITH-PRODUCT-REVIEWER
+
+# Gate 2: tech lead must approve PRs that add/modify validation.md
+features/*/validation.md     @REPLACE-WITH-TECH-LEAD

@@ -24,7 +24,7 @@ def test_no_healthy_survivors_no_error():
     run_tick(zone, infection_rate=0.1)
     assert zone.healthy == 0
 
-<!-- Tech lead note: Approved 2026-05-13. Fixed RNG seed needed for F1-S1. -->
+<!-- Tech lead note: Approved 2026-05-13. Fixed RNG seed needed for F1-S1. Approved-by: @tech-lead -->
 
 @pytest.fixture(autouse=True)
 def fixed_seed():

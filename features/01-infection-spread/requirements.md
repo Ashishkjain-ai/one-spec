@@ -20,4 +20,4 @@ Given a zone with 10 infected and 0 healthy survivors
 When a tick runs
 Then the zone state remains unchanged (no division by zero, no errors)
 
-<!-- Reviewer note (product reviewer): Approved 2026-05-12. -->
+<!-- Reviewer note (product reviewer): Approved 2026-05-12. Approved-by: @product-reviewer -->

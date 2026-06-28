@@ -52,7 +52,7 @@ example has a real runnable test with the scenario ID in it.
 
 ---
 
-### [ ] G3. Make approval credible — CODEOWNERS + linter check
+### [x] G3. Make approval credible — CODEOWNERS + linter check
 
 **Problem.** Approval = anyone typing "Approved" in an HTML comment.
 No identity, nothing that fails if skipped.

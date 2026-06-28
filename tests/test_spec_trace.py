@@ -35,7 +35,7 @@ def write_requirements(folder: Path, ids=('F1-S1',), approved=False):
     for id_ in ids:
         lines += [f'### {id_}', 'Given x', 'When y', 'Then z', '']
     if approved:
-        lines.append('<!-- Reviewer note (product reviewer): Approved. -->')
+        lines.append('<!-- Reviewer note (product reviewer): Approved. Approved-by: @test-user -->')
     (folder / 'requirements.md').write_text('\n'.join(lines))
 
 
@@ -44,7 +44,7 @@ def write_validation(folder: Path, ids=('F1-S1',), approved=False):
     for id_ in ids:
         lines += [f'## {id_} → test_{id_.lower().replace("-", "_")}', 'TODO', '']
     if approved:
-        lines.append('<!-- Tech lead note: Approved. -->')
+        lines.append('<!-- Tech lead note: Approved. Approved-by: @test-user -->')
     (folder / 'validation.md').write_text('\n'.join(lines))
 
 
@@ -249,6 +249,71 @@ class TestEdgeCases(unittest.TestCase):
     def test_missing_features_dir_exits_with_error(self):
         code, out = run_check(Path('/nonexistent/path/features'))
         self.assertEqual(code, 1)
+
+
+# ---------------------------------------------------------------------------
+# G3: Approved-by: @name requirement
+# ---------------------------------------------------------------------------
+
+class TestApprovedBy(unittest.TestCase):
+
+    def test_approval_without_name_fails_gate1(self):
+        """Gate 1: approval comment without Approved-by: @name is rejected."""
+        with tempfile.TemporaryDirectory() as tmp:
+            d = Path(tmp)
+            f = d / '01-feat'; f.mkdir()
+            (f / 'requirements.md').write_text(
+                '### F1-S1\nGiven x\nWhen y\nThen z\n'
+                '<!-- Reviewer note (product reviewer): Approved. -->\n'
+            )
+            (f / 'validation.md').write_text('## F1-S1 → test_x\nTODO\n')
+            code, out = run_check(d)
+            self.assertEqual(code, 1)
+            self.assertIn('gate 1', out)
+            self.assertIn('Approved-by', out)
+
+    def test_approval_without_name_fails_gate2(self):
+        """Gate 2: tech lead approval without Approved-by: @name is rejected."""
+        with tempfile.TemporaryDirectory() as tmp:
+            d = Path(tmp)
+            f = d / '01-feat'; f.mkdir()
+            write_requirements(f, approved=True)
+            (f / 'validation.md').write_text(
+                '## F1-S1 → test_x\nTODO\n'
+                '<!-- Tech lead note: Approved. -->\n'
+            )
+            write_plan(f)
+            code, out = run_check(d)
+            self.assertEqual(code, 1)
+            self.assertIn('gate 2', out)
+            self.assertIn('Approved-by', out)
+
+    def test_approval_with_name_passes(self):
+        """Approval comments with Approved-by: @name satisfy both gates."""
+        with tempfile.TemporaryDirectory() as tmp:
+            d = Path(tmp)
+            f = d / '01-feat'; f.mkdir()
+            write_requirements(f, approved=True)
+            write_validation(f, approved=True)
+            write_plan(f)
+            code, out = run_check(d)
+            self.assertEqual(code, 0, msg=out)
+
+    def test_approved_by_without_at_sign_passes(self):
+        """Approved-by: name (without @) is also accepted."""
+        with tempfile.TemporaryDirectory() as tmp:
+            d = Path(tmp)
+            f = d / '01-feat'; f.mkdir()
+            (f / 'requirements.md').write_text(
+                '### F1-S1\nGiven x\nWhen y\nThen z\n'
+                '<!-- Reviewer note (product reviewer): Approved. Approved-by: alice -->\n'
+            )
+            (f / 'validation.md').write_text(
+                '## F1-S1 → test_x\nTODO\n'
+                '<!-- Tech lead note: Approved. Approved-by: bob -->\n'
+            )
+            code, out = run_check(d)
+            self.assertEqual(code, 0, msg=out)
 
 
 # ---------------------------------------------------------------------------

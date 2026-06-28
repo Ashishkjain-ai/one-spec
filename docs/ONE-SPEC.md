@@ -140,9 +140,30 @@ Two stop points, enforced by your project's `CLAUDE.md`:
 2. After `validation.md` is drafted → **STOP**, wait for a tech lead to add
    an approval comment before drafting `plan.md`
 
-Approvals are HTML comments (`<!-- Reviewer note: ... -->`) inline in the
-file. This means the approval is git-diffable, version-controlled, and sits
-directly in the artifact the agent reads next — no external system needed.
+Approvals are HTML comments inline in the file and must name the approver:
+
+```markdown
+<!-- Reviewer note (product reviewer): Approved 2026-05-12. Approved-by: @alice -->
+```
+
+```markdown
+<!-- Tech lead note: Approved 2026-05-13. Approved-by: @bob -->
+```
+
+The `Approved-by: @name` field is required — `spec-trace` rejects an approval
+comment that is missing it (gate violation).
+
+**Two enforcement layers:**
+
+- **`CODEOWNERS`** (`.github/CODEOWNERS`): GitHub blocks the PR that adds the
+  approval comment from merging unless the named owner has reviewed it. Fill in
+  real GitHub handles and enable "Require review from Code Owners" in branch
+  protection. This is the identity layer — it prevents self-approval.
+- **`spec-trace` C5**: validates that the `Approved-by: @name` field is present
+  and non-empty. Catches cases where someone writes "Approved" with no name.
+
+Together: the approval is traceable to a named person (in the file), verified
+by GitHub (CODEOWNERS), and enforced by the linter (spec-trace).
 
 ---
 

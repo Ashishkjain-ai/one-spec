@@ -31,8 +31,10 @@ your-repo/
 ├── .claude/skills/
 │   ├── one-spec-init/SKILL.md           # one-time bootstrap skill (/one-spec-init)
 │   └── feature-spec/SKILL.md            # drafts requirements.md from a one-liner (/feature-spec)
-├── .github/workflows/
-│   └── spec-trace.yml                   # CI: runs linter on every push and PR
+├── .github/
+│   ├── CODEOWNERS                       # maps feature files to named reviewers
+│   └── workflows/
+│       └── spec-trace.yml               # CI: runs linter on every push and PR
 ├── .one-spec/hooks/
 │   └── pre-commit                       # pre-commit hook (symlink once to .git/hooks/)
 └── features/
@@ -72,7 +74,18 @@ Two human gates, enforced by `CLAUDE.md`, recorded as inline comments in the fil
 1. **Product reviewer** approves `requirements.md` before `validation.md` is drafted
 2. **Tech lead** approves `validation.md` before implementation begins
 
-No external approval system — the approval *is* a comment in the file Claude is about to act on next. Git-diffable and version-controlled alongside the spec itself.
+Approval comments must name the approver:
+
+```markdown
+<!-- Reviewer note (product reviewer): Approved 2026-05-12. Approved-by: @alice -->
+<!-- Tech lead note: Approved 2026-05-13. Approved-by: @bob -->
+```
+
+**Two enforcement layers:**
+- **`CODEOWNERS`** — GitHub blocks PRs that add approval comments unless the named reviewer approved the PR. Fill in `.github/CODEOWNERS` with real handles and enable branch protection.
+- **`spec-trace` C5** — linter rejects any approval comment missing `Approved-by: @name`.
+
+Together: identity is in the file (git history), verified at the PR level (CODEOWNERS), and caught by the linter if skipped.
 
 ## Enforcement (spec-trace)
 
@@ -124,6 +137,7 @@ ln -s ../../.one-spec/hooks/pre-commit .git/hooks/pre-commit
    - `.claude/skills/feature-spec/SKILL.md` — the drafting skill
    - `features/_template/*` — blank templates
    - `spec-trace` — the linter (copy this file, it has no dependencies)
+   - `.github/CODEOWNERS` — maps feature files to named reviewers (fill in handles)
    - `.github/workflows/spec-trace.yml` — CI enforcement
    - `.one-spec/hooks/pre-commit` — pre-commit hook
    - Updates your `CLAUDE.md` with the workflow rules

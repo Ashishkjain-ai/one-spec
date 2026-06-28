@@ -33,6 +33,7 @@ or "run one-spec-init".
    - `features/_template/validation.md`
    - `features/_template/plan.md`
    - `spec-trace` (the linter — Python, zero deps)
+   - `.github/CODEOWNERS` (role-based approval enforcement — fill in handles)
    - `.github/workflows/spec-trace.yml` (CI check)
    - `.one-spec/hooks/pre-commit` (pre-commit hook)
 
@@ -56,13 +57,15 @@ or "run one-spec-init".
    - Note any of `mission.md` / `tech-stack.md` / `roadmap.md` that are
      missing, with a one-line explanation that they're recommended but not
      required for one-spec itself
+   - Remind the user to fill in `.github/CODEOWNERS` with real GitHub handles
+     and enable "Require review from Code Owners" in branch protection settings
    - Tell the user to wire up the pre-commit hook (one-time step):
      ```bash
      ln -s ../../.one-spec/hooks/pre-commit .git/hooks/pre-commit
      ```
    - Tell the user to verify the linter passes on the current state:
      ```bash
-     python spec-trace check
+     python spec-trace check --repo-root .
      ```
    - Offer: "Want me to draft the first feature spec? Give me a one-line
      idea and I'll use the feature-spec skill."
@@ -220,9 +223,30 @@ Two stop points, enforced by your project's `CLAUDE.md`:
 2. After `validation.md` is drafted → **STOP**, wait for a tech lead to add
    an approval comment before drafting `plan.md`
 
-Approvals are HTML comments (`<!-- Reviewer note: ... -->`) inline in the
-file. This means the approval is git-diffable, version-controlled, and sits
-directly in the artifact the agent reads next — no external system needed.
+Approvals are HTML comments inline in the file and must name the approver:
+
+```markdown
+<!-- Reviewer note (product reviewer): Approved 2026-05-12. Approved-by: @alice -->
+```
+
+```markdown
+<!-- Tech lead note: Approved 2026-05-13. Approved-by: @bob -->
+```
+
+The `Approved-by: @name` field is required — `spec-trace` rejects an approval
+comment that is missing it (gate violation).
+
+**Two enforcement layers:**
+
+- **`CODEOWNERS`** (`.github/CODEOWNERS`): GitHub blocks the PR that adds the
+  approval comment from merging unless the named owner has reviewed it. Fill in
+  real GitHub handles and enable "Require review from Code Owners" in branch
+  protection. This is the identity layer — it prevents self-approval.
+- **`spec-trace` C5**: validates that the `Approved-by: @name` field is present
+  and non-empty. Catches cases where someone writes "Approved" with no name.
+
+Together: the approval is traceable to a named person (in the file), verified
+by GitHub (CODEOWNERS), and enforced by the linter (spec-trace).
 
 ---
 
@@ -362,7 +386,7 @@ Then <expected outcome>
 - Scenario IDs are sequential, never reused.
 -->
 
-<!-- Reviewer note (product reviewer): -->
+<!-- Reviewer note (product reviewer): Approved YYYY-MM-DD. Approved-by: @your-handle -->
 ~~~
 
 ### `features/_template/validation.md`
@@ -391,7 +415,7 @@ TODO: implement test for F<n>-S1 in the project's test framework
 <!-- Given <initial state> / When <action> / Then <expected outcome> -->
 TODO: implement test for F<n>-S2 in the project's test framework
 
-<!-- Tech lead note: -->
+<!-- Tech lead note: Approved YYYY-MM-DD. Approved-by: @your-handle -->
 ~~~
 
 ### `features/_template/plan.md`
@@ -445,6 +469,8 @@ _ID_REF = re.compile(r'\bF\d+-S\d+\b')
 _HTML_COMMENT = re.compile(r'<!--(.*?)-->', re.DOTALL)
 # test_F1_S1_* function definition in a Python test file
 _TEST_FN = re.compile(r'def\s+test_[A-Za-z0-9_]*F(\d+)_S(\d+)', re.MULTILINE)
+# Approved-by: @name (or Approved-by: name) inside an approval comment
+_APPROVED_BY = re.compile(r'approved-by:\s*\S', re.IGNORECASE)
 
 
 def _read(path: Path) -> str:
@@ -459,13 +485,23 @@ def _referenced_ids(path: Path) -> set:
     return set(_ID_REF.findall(_read(path)))
 
 
-def _approved(path: Path, role: str) -> bool:
+def _approval_status(path: Path, role: str) -> str:
+    """Check approval state of a file for the given role.
+
+    Returns:
+      'approved'      — comment has role + approved + Approved-by: <name>
+      'missing-name'  — comment has role + approved but no Approved-by field
+      'unapproved'    — no matching approval comment found
+    """
     role_lower = role.lower()
     for m in _HTML_COMMENT.finditer(_read(path)):
-        body = m.group(1).lower()
-        if role_lower in body and 'approved' in body:
-            return True
-    return False
+        body = m.group(1)
+        body_lower = body.lower()
+        if role_lower in body_lower and 'approved' in body_lower:
+            if _APPROVED_BY.search(body):
+                return 'approved'
+            return 'missing-name'
+    return 'unapproved'
 
 
 def _feature_folders(features_dir: Path) -> list:
@@ -512,21 +548,35 @@ def _check_gates(folders: list) -> list:
                 failures.append(
                     f"FAIL {folder.name}: validation.md exists but requirements.md is missing"
                 )
-            elif not _approved(req, 'reviewer note'):
-                failures.append(
-                    f"FAIL {folder.name}: gate 1 violated — validation.md exists but "
-                    f"requirements.md has no approval comment"
-                )
+            else:
+                status = _approval_status(req, 'reviewer note')
+                if status == 'unapproved':
+                    failures.append(
+                        f"FAIL {folder.name}: gate 1 violated — validation.md exists but "
+                        f"requirements.md has no approval comment"
+                    )
+                elif status == 'missing-name':
+                    failures.append(
+                        f"FAIL {folder.name}: gate 1 violated — requirements.md approval "
+                        f"comment is missing 'Approved-by: @name'"
+                    )
         if plan.exists():
             if not val.exists():
                 failures.append(
                     f"FAIL {folder.name}: plan.md exists but validation.md is missing"
                 )
-            elif not _approved(val, 'tech lead note'):
-                failures.append(
-                    f"FAIL {folder.name}: gate 2 violated — plan.md exists but "
-                    f"validation.md has no approval comment"
-                )
+            else:
+                status = _approval_status(val, 'tech lead note')
+                if status == 'unapproved':
+                    failures.append(
+                        f"FAIL {folder.name}: gate 2 violated — plan.md exists but "
+                        f"validation.md has no approval comment"
+                    )
+                elif status == 'missing-name':
+                    failures.append(
+                        f"FAIL {folder.name}: gate 2 violated — validation.md approval "
+                        f"comment is missing 'Approved-by: @name'"
+                    )
     return failures
 
 
@@ -662,6 +712,25 @@ if __name__ == '__main__':
     main()
 ~~~
 
+### `.github/CODEOWNERS`
+
+~~~
+# one-spec CODEOWNERS — enforces role-based approval at the PR level.
+#
+# GitHub blocks merging any PR that touches these files unless the named
+# owner has approved it. This is the identity layer that backs the
+# Approved-by: @name field in the approval comment.
+#
+# Replace the placeholders with real GitHub handles, then enable
+# "Require review from Code Owners" in your branch protection rules.
+
+# Gate 1: product reviewer must approve PRs that add/modify requirements.md
+features/*/requirements.md   @REPLACE-WITH-PRODUCT-REVIEWER
+
+# Gate 2: tech lead must approve PRs that add/modify validation.md
+features/*/validation.md     @REPLACE-WITH-TECH-LEAD
+~~~
+
 ### `.github/workflows/spec-trace.yml`
 
 ~~~yaml
@@ -700,8 +769,8 @@ python spec-trace check --repo-root .
 # CLAUDE.md additions for one-spec
 
 Paste the section below into your project's `CLAUDE.md`. Adjust the
-"Project" and "Stack" sections to match your repo — the "Workflow" and
-"Roles" sections can be used as-is.
+"Project" and "Stack" sections to match your repo — the "Workflow",
+"Roles", and "Notes on the gate checks" sections can be used as-is.
 
 ---
 
@@ -754,17 +823,20 @@ test design.
 The approval comments look like this and live inline in the file:
 
 ```markdown
-<!-- Reviewer note (product reviewer): Approved 2026-05-12. -->
+<!-- Reviewer note (product reviewer): Approved 2026-05-12. Approved-by: @alice -->
 ```
 
 ```markdown
-<!-- Tech lead note: Approved 2026-05-13. Fixed RNG seed needed for F1-S1. -->
+<!-- Tech lead note: Approved 2026-05-13. Approved-by: @bob -->
 ```
 
-Claude should look for these HTML comments specifically. If a human adds
-notes *without* the word "Approved", treat it as feedback requiring changes
-to `requirements.md`/`validation.md` before re-requesting approval — do not
-treat any comment as automatic sign-off.
+The `Approved-by: @name` field is **required** — `spec-trace` rejects approval
+comments that are missing it. Claude should check for both "Approved" and
+"Approved-by: @name" before treating a gate as passed.
+
+If a human adds notes *without* the word "Approved", treat it as feedback
+requiring changes before re-requesting approval — do not treat any comment as
+automatic sign-off.
 ~~~
 
 ---

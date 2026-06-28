@@ -28,6 +28,8 @@ _ID_REF = re.compile(r'\bF\d+-S\d+\b')
 _HTML_COMMENT = re.compile(r'<!--(.*?)-->', re.DOTALL)
 # test_F1_S1_* function definition in a Python test file
 _TEST_FN = re.compile(r'def\s+test_[A-Za-z0-9_]*F(\d+)_S(\d+)', re.MULTILINE)
+# Approved-by: @name (or Approved-by: name) inside an approval comment
+_APPROVED_BY = re.compile(r'approved-by:\s*\S', re.IGNORECASE)
 
 
 def _read(path: Path) -> str:
@@ -44,19 +46,27 @@ def _referenced_ids(path: Path) -> set:
     return set(_ID_REF.findall(_read(path)))
 
 
-def _approved(path: Path, role: str) -> bool:
-    """True if any single HTML comment contains both `role` and 'approved'.
+def _approval_status(path: Path, role: str) -> str:
+    """Check approval state of a file for the given role.
 
-    Checks each comment in isolation so that explanatory text mentioning
-    'Approved' in one comment cannot satisfy the approval test for another.
+    Returns:
+      'approved'      — comment has role + approved + Approved-by: <name>
+      'missing-name'  — comment has role + approved but no Approved-by field
+      'unapproved'    — no matching approval comment found
+
+    Checks each HTML comment in isolation so that text mentioning 'Approved'
+    in one comment cannot satisfy the test for another.
     Role examples: 'reviewer note', 'tech lead note'.
     """
     role_lower = role.lower()
     for m in _HTML_COMMENT.finditer(_read(path)):
-        body = m.group(1).lower()
-        if role_lower in body and 'approved' in body:
-            return True
-    return False
+        body = m.group(1)
+        body_lower = body.lower()
+        if role_lower in body_lower and 'approved' in body_lower:
+            if _APPROVED_BY.search(body):
+                return 'approved'
+            return 'missing-name'
+    return 'unapproved'
 
 
 def _feature_folders(features_dir: Path) -> list:
@@ -115,22 +125,36 @@ def _check_gates(folders: list) -> list:
                 failures.append(
                     f"FAIL {folder.name}: validation.md exists but requirements.md is missing"
                 )
-            elif not _approved(req, 'reviewer note'):
-                failures.append(
-                    f"FAIL {folder.name}: gate 1 violated — validation.md exists but "
-                    f"requirements.md has no approval comment"
-                )
+            else:
+                status = _approval_status(req, 'reviewer note')
+                if status == 'unapproved':
+                    failures.append(
+                        f"FAIL {folder.name}: gate 1 violated — validation.md exists but "
+                        f"requirements.md has no approval comment"
+                    )
+                elif status == 'missing-name':
+                    failures.append(
+                        f"FAIL {folder.name}: gate 1 violated — requirements.md approval "
+                        f"comment is missing 'Approved-by: @name'"
+                    )
 
         if plan.exists():
             if not val.exists():
                 failures.append(
                     f"FAIL {folder.name}: plan.md exists but validation.md is missing"
                 )
-            elif not _approved(val, 'tech lead note'):
-                failures.append(
-                    f"FAIL {folder.name}: gate 2 violated — plan.md exists but "
-                    f"validation.md has no approval comment"
-                )
+            else:
+                status = _approval_status(val, 'tech lead note')
+                if status == 'unapproved':
+                    failures.append(
+                        f"FAIL {folder.name}: gate 2 violated — plan.md exists but "
+                        f"validation.md has no approval comment"
+                    )
+                elif status == 'missing-name':
+                    failures.append(
+                        f"FAIL {folder.name}: gate 2 violated — validation.md approval "
+                        f"comment is missing 'Approved-by: @name'"
+                    )
 
     return failures
 
